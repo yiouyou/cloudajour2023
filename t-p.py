@@ -14,8 +14,8 @@ def parse_df(_df, _csv, _key, _periods):
     fig1 = m.plot(forecast)
     fig2 = m.plot_components(forecast)
     name, extension = os.path.splitext(_csv)
-    fig1.savefig(f"{name}_{_key}_fig1.png")
-    fig2.savefig(f"{name}_{_key}_fig2.png")
+    fig1.savefig(f"{name}_p_{_key}_fig1.png")
+    fig2.savefig(f"{name}_p_{_key}_fig2.png")
 
 def remove_timezone(timestamp):
     return timestamp.replace("Z", "")
@@ -39,3 +39,4 @@ for _key, _df in dfs.items():
     # print(_df)
     parse_df(_df, _csv, _key, _periods)
     print("----")
+
