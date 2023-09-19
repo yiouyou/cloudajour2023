@@ -17,6 +17,7 @@ df = pd.read_csv(
 print(df.head())
 
 dataset = PandasDataset(df, target="#Passengers")
+print(dataset)
 
 # Split the data for training and testing
 training_data, test_gen = split(dataset, offset=-36)
@@ -30,7 +31,7 @@ model = DeepAREstimator(
 ).train(training_data)
 
 forecasts = list(model.predict(test_data.input))
-print(forecasts)
+# print(forecasts)
 
 # Plot predictions
 plt.plot(df["1954":], color="black")
