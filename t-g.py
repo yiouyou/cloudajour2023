@@ -1,5 +1,9 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.dates import (
+    AutoDateLocator,
+    AutoDateFormatter
+)
 import sys, os
 
 from gluonts.dataset.pandas import PandasDataset
@@ -32,16 +36,46 @@ def plot_dataset_splitting(original_dataset, training_dataset, test_pairs):
             plt.savefig(f"222.png")
 
 
-def parse_df(_df, _target):
+def parse_df(_df, _target, _csv):
+    _date_start = '2023-08-30'
+    _date_end = '2023-09-03'
+    org_df_se = _df[_date_start:_date_end]
+    print(org_df_se.head())
+    print(org_df_se.tail())
+    plt.figure(figsize=(24, 6))
+    plt.plot(org_df_se[_target], color="black")
+    
     ##### timestamp column is not evenly spaced and monotonically increasing we get an error when using PandasDataset. Here we show how to fill in the gaps that are missing
-    max_end = max(_df.groupby("item_id").apply(lambda _df: _df.index[-1]))
+    max_end = max(_df.groupby("item_id").apply(lambda x: x.index[-1]))
     dfs_dict = {}
-    for item_id, gdf in df.groupby("item_id"):
+    for item_id, gdf in _df.groupby("item_id"):
         new_index = pd.date_range(gdf.index[0], end=max_end, freq="5T")  # 设置为5分钟频率
-        dfs_dict[item_id] = gdf.reindex(new_index).assign(item_id=item_id).fillna(method='ffill')  # 可以使用fillna填充缺失值
-    print(dfs_dict)
+        # new_gdf = gdf.resample('5T').interpolate(method='linear')
+        # new_gdf["item_id"] = item_id
+        # dfs_dict[item_id] = new_gdf
+        dfs_dict[item_id] = gdf.reindex(new_index).assign(item_id=item_id).fillna(method='ffill')  # "forward fill", 也可以使用fillna填充缺失值
+    new_df = dfs_dict[0]
+    new_df_se = new_df[_date_start:_date_end]
+    print(new_df_se.head())
+    print(new_df_se.tail())
+    plt.plot(new_df_se[_target], color="red")
+
+    plt.xlabel('Time')
+    plt.ylabel('Value')
+    plt.title('Time Series Data')
+    plt.grid(True)
+    # 自动设置日期时间刻度和格式
+    locator = AutoDateLocator()
+    formatter = AutoDateFormatter(locator)
+    plt.gca().xaxis.set_major_locator(locator)
+    plt.gca().xaxis.set_major_formatter(formatter)
+    plt.xticks(rotation=45)  # 旋转刻度标签以避免重叠
+    plt.tight_layout()
+    _fn, _ext = os.path.splitext(os.path.basename(_csv))
+    plt.savefig(f"{_fn}_{_target}_{_date_start}_{_date_end}.png")
+
     # 这里dfs_dict包含了重新索引后的DataFrame
-    _ds = PandasDataset(dfs_dict, target=_target)
+    _ds = PandasDataset(dfs_dict[0], target=_target)
     print(_ds)
     # _ds = PandasDataset.from_long_dataframe(ds, target=_target, item_id="item_id")
 
@@ -55,7 +89,7 @@ def parse_df(_df, _target):
     model = DeepAREstimator(
         prediction_length=prediction_length,
         freq="5T",
-        trainer_kwargs={"max_epochs": 10}
+        trainer_kwargs={"max_epochs": 5}
     ).train(training_data)
     forecasts = list(model.predict(test_data.input))
     # print(forecasts)
@@ -64,19 +98,16 @@ def parse_df(_df, _target):
     for forecast in forecasts:
         forecast.plot(show_label=True)
     plt.legend(["True values"], loc="upper left", fontsize="xx-large")
-    name, extension = os.path.splitext(_csv)
-    plt.savefig(f"{name}_g_{_target}.png")
+    plt.savefig(f"{_fn}_g_DeepAR_{_target}.png")
 
 
-def remove_timezone(timestamp):
-    return timestamp.replace("Z", "")
 
 _csv = sys.argv[1]
 
-df = pd.read_csv(_csv)
-df.rename(columns={'timestamp': 'ds'}, inplace=True)
-df['ds'] = df['ds'].apply(remove_timezone)
-print(df.head())
+# df = pd.read_csv(_csv)
+# df.rename(columns={'timestamp': 'ds'}, inplace=True)
+# df['ds'] = pd.to_datetime(df['ds'])
+# print(df.head())
 
 df = pd.read_csv(_csv, index_col=0, parse_dates=True)
 print(df.head())
@@ -87,12 +118,14 @@ print(other_columns)
 df["item_id"] = 0
 df = df.sort_index(ascending=True)
 print(df.head())
-
+print(df.tail())
 # exit()
 
 
 for i in other_columns:
+    print("----")
     print(i)
-    parse_df(df, i)
+    print("----")
+    parse_df(df[[i, "item_id"]], i, _csv)
     print("----")
 
